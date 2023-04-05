@@ -14,11 +14,11 @@ main:
 	
 	mainloop:
 		jal drawbox 
-		addi $t1, $t1, 4
 		li $v0, 32
 		li $a0, 400000
 		clearbox:
 	# clear previous square, starting from four rows above, three cols to the left
+			bgt $t1, 512, mainloop
 			addi	$a1, $a1, -ROW_LEN
 			addi	$a1, $a1, -ROW_LEN
 			addi	$a1, $a1, -ROW_LEN
@@ -30,7 +30,7 @@ main:
 			li	$a3, -48
 			jal	clear
 		# ------------------------------------
-		blt $t1, 512, mainloop
+		
 		
 		
 	j end

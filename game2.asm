@@ -1,49 +1,12 @@
-#####################################################################
-#
-# CSCB58 Winter 2023 Assembly Final Project
-# University of Toronto, Scarborough
-#
-# Student: Adam Badar, 1007965338, badarada, adam.badar@mail.utoronto.ca
-#
-# Bitmap Display Configuration:
-# - Unit width in pixels: 4 (update this as needed)
-# - Unit height in pixels: 4 (update this as needed)
-# - Display width in pixels: 256 (update this as needed)
-# - Display height in pixels: 512 (update this as needed)
-# - Base Address for Display: 0x10008000 ($gp)
-#
-# Which milestones have been reached in this submission?
-# (See the assignment handout for descriptions of the milestones)
-# - Milestone 1/2/3 (choose the one the applies)
-#
-# Which approved features have been implemented for milestone 3?
-# (See the assignment handout for the list of additional features)
-# 1. (fill in the feature, if any)
-# 2. (fill in the feature, if any)
-# 3. (fill in the feature, if any)
-# ... (add more if necessary)
-#
-# Link to video demonstration for final submission:
-# - (insert YouTube / MyMedia / other URL here). Make sure we can view it!
-#
-# Are you OK with us sharing the video with people outside course staff?
-# - yes, and please share this project github link as well!
-#
-# Any additional information that the TA needs to know:
-# $t0
-#
-#####################################################################
 
+#DEFINE CONSTANTS
 # width = 64, height = 128
-.eqv 	BASE_ADDRESS 	0x10008000
-.eqv	END_ADDRESS	0x1000FFFC	#4*(64*128-1)
-.eqv	TOP_RIGHT	0x100080F8
-.eqv	INITIAL_POODLE	0x1000BBFC	#4*(60*64-1)
-.eqv	SHIFT_SHIP_LAST	1324	
+.eqv 	BASE_ADDRESS 	0x10008000	#top-left pixel
+.eqv	START_POSITION	0x1000F880	#starting position for poodle (64*120+32)*4
+.eqv	TOP_RIGHT	0x100080FC	#top-right pixel
+.eqv	END		0x1000FFFC
 .eqv	ROW_LEN		256
-.eqv	WAIT_TIME	30 
-
-#Colours
+#DEFINE COLOURS
 .eqv	WHITE		0xffffff
 .eqv	RED		0xff0000
 .eqv	GREEN		0x00ff00
@@ -57,24 +20,43 @@
 .eqv	BROWN		0x7e3f00
 .eqv	GREY		0x7e7e7e
 .eqv	BLACK		0x000000
+.eqv	BACKGROUND	0Xffffe0
 
-.data
-backgroundArr: .word 0x6fb1ff:1024
-	
 .text
 .globl main
 
-#POODLE-JUMP :))
+main:
+	li $a0, BASE_ADDRESS
+	li $a1, END
+	li $t0, CYAN
+	li $s6, 1000
+	sw $t0, 0($a0)
+	jal drawBackground
+	li $a0, BASE_ADDRESS
+	jal drawPoodle
+	#movement:
+	loop:
+	li	$a0, 0xffff0000
+	lw	$t9, 0($a0)
+	bne	$t9, 1, main_update
+	jal	keypress
+	main_update:
+	move $a0, $s1
+	jal drawPoodle
+	move $s0, $s1
+	move $a0, $a1
+	main_sleep:
+			# Wait one second (20 milliseconds)
+			# decremennt if 
+			li	$v0, 32
+			move	$a0, $s6
+			syscall
+		# ------------------------------------
 
-
-main: 
-	li	$a0, BASE_ADDRESS		# $a0 stores the base address for display
-	li	$a1, END_ADDRESS	# 
-	li	$a2, -ROW_LEN			# negative width
-	#jal	clear				# jump to clear and save position to $ra
+		j loop
 	
-	#................................#
-	# GLOBAL variables
+	
+	# TEMPORARY VARS
 		# $s0: previous character location
 		# $s1: current character location
 		# $s2: platform shift increment
@@ -87,46 +69,17 @@ main:
 	# main variables
 		# $t9: temp
 	#................................#
-	#Initialization
-		#poodle location
-		li $s1, INITIAL_POODLE
-		li $s0, END_ADDRESS
-		addi $s0, $s0, -ROW_LEN
-		li $s3, 0
-		li $s4, -1
-		li $s6, WAIT_TIME
-		li $s7, WAIT_TIME
-		
-	mainLoop:
-	#Get input from keyboard
-		
-		
-	#Erase objects from old position
-		beq $s3, $zero, mainClear
-		
-		mainClear:
-			move $a0, $s0
-			addi	$a0, $a0, -ROW_LEN
-			addi	$a0, $a0, -ROW_LEN
-			move	$a1, $s0
-			addi	$a1, $a1, SHIFT_SHIP_LAST
-			addi	$a1, $a1, ROW_LEN
-			addi	$a1, $a1, ROW_LEN
-			li	$a2, -48
-			jal	clear	
+	li $v0, 10
+	syscall
 	
-		main_draw:
-			# redraw ship:
-			move	$a0, $s1
-			jal	drawPoodle					# jump to draw_ship and save position to $ra
-			move 	$s0, $s1
-		mainSleep:
-			li $v0, 32
-			move $a0, $s6
-			syscall
-		j mainLoop
-		
-
+return:
+	jr $ra
+#FINISH PEACEFULLLY
+end:
+	li $v0, 10
+	syscall
+	
+#.......................................
 
 # ------------------------------------
 # handling different keypresses
@@ -139,11 +92,9 @@ main:
 		# $t9: temp
 keypress:
 	li	$t1, ROW_LEN
-	li	$t2, BASE_ADDRESS
-	addi	$t2, $t2, ROW_LEN
-	li	$t3, END_ADDRESS
-	addi	$t3, $t3, -SHIFT_SHIP_LAST
-	addi	$t3, $t3, -ROW_LEN
+	li	$t2, 252
+	addi	$t2, $t2, 252
+	li	$t3, END
 	
 	lw	$t0, 4($a0)
 	beq	$t0, 0x61, key_a						# ASCII code of 'a' is 0x61 or 97 in decimal
@@ -158,7 +109,7 @@ keypress:
 		div	$s1, $t1						# see if ship position is divisible by the width
 		mfhi	$t9							# $t9 = $s1 mod $t1 
 		beq	$t9, $zero, keypress_done				# if it is in the left column, we can't go left
-		addi	$s1, $s1, -8						# else, move left
+		addi	$s1, $s1, -4					# else, move left
 		b keypress_done
 
 	# go up
@@ -176,15 +127,15 @@ keypress:
 		mfhi	$t9							# $t9 = $s1 mod $t1 
 		addi	$t1, $t1, -48						# need to check if the mod is the row size - 12*4 (width of plane-1)
 		beq	$t9, $t1, keypress_done					# if it is in the far right column, we can't go right
-		addi	$s1, $s1, 8						# else, move right
+		addi	$s1, $s1, 4						# else, move right
 		b keypress_done
 
 	# go down
 	key_s:
 		# make sure ship is not in bottom row
 		bgt	$s1, $t3, keypress_done					# if $s1 is in the bottom row, don't go down
-		addi	$s1, $s1, ROW_LEN				# else, move down
-		addi	$s1, $s1, ROW_LEN				# else, move down
+		addi	$s1, $s1, ROW_LEN					# else, move down
+		addi	$s1, $s1, ROW_LEN					# else, move down
 		b keypress_done
 
 	key_p:
@@ -195,84 +146,20 @@ keypress:
 	keypress_done:
 		jr	$ra							# jump to ra
 # ------------------------------------
-
-# clear screen between given addresses
-	# $a0: start address
-	# $a1: end address
-	# $a2: negative of the width*4 of box to clear
-	# useS:
-		# $t8: COLOUR_NIGHT
-		# $t9: negative increment
-clear:
-	li	$t8, BLUE
-	li	$t9, 0								# increment
 	
-	clear_loop:
-		bgt	$a0, $a1, clear_loop_done
-		# if the increment is equal to the negative width, go down a row
-		beq	$t9, $a2, clear_loop_next_row
-		sw	$t8, 0($a0)						# clear $a0 colour
-		addi	$a0, $a0, 4						# $a0 = $a0 + 4
-		addi	$t9, $t9, -4						# $t9 = $t9 - 4
-		j	clear_loop						# jump to clear_loop
-	clear_loop_next_row:
-		add	$a0, $a0, $t9						# $a0 = $a0 - width*4
-		addi	$a0, $a0, ROW_LEN				# set $a0 to next row
-		li	$t9, 0							# reset increment $t9 = 0
-		j clear_loop
-	clear_loop_done:
-		jr	$ra							# jump to $ra
-# ------------------------------------
 
-return:	jr $ra
+#SET BACKGROUND..........................
 
-# end program
-end:
-	jal	draw_dead
-	# darken screen
-	li	$v0, 10								# $v0 = 10 terminate the program gracefully
-	syscall
+drawBackground:
+	li $t4, BACKGROUND
+	bgt $a0, $a1, return
+	sw $t4, 0($a0)
+	addi $a0, $a0, 4
+	j drawBackground
+	
 
-#....................................#
+#DRAW OBJECTS............................
 
-# ------------------------------------
-# draw GAME OVER
-	# uses:
-		# $a0: DISPLAY_DEAD
-		# $a1: COLOUR_NUMBER
-		# #t9: hold old $ra
-draw_dead:
-	li	$a1, WHITE
-	move 	$t9, $ra
-
-	li	$a0, TOP_RIGHT
-	jal	drawG
-	li	$a0, TOP_RIGHT
-	addi	$a0, $a0, 20
-	jal	drawA
-	li	$a0, TOP_RIGHT
-	addi	$a0, $a0, 40
-	jal	drawM
-	li	$a0, TOP_RIGHT
-	addi	$a0, $a0, 60
-	jal	drawE
-	li	$a0, TOP_RIGHT
-	addi	$a0, $a0, 60
-	jal	drawO
-	li	$a0, TOP_RIGHT
-	addi	$a0, $a0, 60
-	jal	drawV
-	li	$a0, TOP_RIGHT
-	addi	$a0, $a0, 60
-	jal	drawE
-	li	$a0, TOP_RIGHT
-	addi	$a0, $a0, 60
-	jal	drawR
-
-	jr	$t9
-# ------------------------------------
-
-#DRAW FUNCTIONS
 drawG:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
@@ -303,7 +190,7 @@ drawG:
 	sw $t8, 12($a0)
 	sw $t8, 16($a0)
 	sw $t8, 20($a0)
-	jal return
+	jr $ra
 
 drawA: 
 	addi $a0, $a0, ROW_LEN
@@ -335,7 +222,7 @@ drawA:
 	addi $a0, $a0, ROW_LEN
 	sw $t8, 0($a0)
 	sw $t8, 20($a0)
-	jal return
+	jr $ra
 
 drawM: 
 	addi $a0, $a0, ROW_LEN
@@ -365,7 +252,7 @@ drawM:
 	addi $a0, $a0, ROW_LEN
 	sw $t8, 0($a0)
 	sw $t8, 20($a0)
-	jal return 
+	jr $ra
 
 drawE:
 	addi $a0, $a0, ROW_LEN
@@ -398,7 +285,7 @@ drawE:
 	sw $t8, 12($a0)
 	sw $t8, 16($a0)
 	sw $t8, 20($a0)
-	jal return 
+	jr $ra
 
 drawO: 
 	addi $a0, $a0, ROW_LEN
@@ -432,7 +319,7 @@ drawO:
 	sw $t8, 8($a0)
 	sw $t8, 12($a0)
 	sw $t8, 16($a0)
-	jal return
+	jr $ra
 
 drawV:
 	addi $a0, $a0, ROW_LEN
@@ -462,12 +349,12 @@ drawV:
 	addi $a0, $a0, ROW_LEN
 	sw $t8, 8($a0)
 	sw $t8, 12($a0)
-	jal return
+	jr $ra
 
 drawR:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 0($a0)
 	sw $t8, 4($a0)
 	sw $t8, 8($a0)
@@ -492,6 +379,7 @@ drawR:
 	addi $a0, $a0, ROW_LEN
 	sw $t8, 0($a0)
 	sw $t8, 16($a0)
+	jr $ra
 	
 drawRedBlock:
 	addi $a0, $a0, ROW_LEN
@@ -516,7 +404,7 @@ drawRedBlock:
 	sw $t8, 24($a0)
 	sw $t8, 28($a0)
 	sw $t8, 32($a0)
-	jal return
+	jr $ra
 
 drawBrownBlock:
 	addi $a0, $a0, ROW_LEN
@@ -541,7 +429,7 @@ drawBrownBlock:
 	sw $t8, 24($a0)
 	sw $t8, 28($a0)
 	sw $t8, 32($a0)
-	jal return
+	jr $ra
 	
 drawOrangeBlock:
 	addi $a0, $a0, ROW_LEN
@@ -566,7 +454,7 @@ drawOrangeBlock:
 	sw $t8, 24($a0)
 	sw $t8, 28($a0)
 	sw $t8, 32($a0)
-	jal return
+	jr $ra
 
 drawCyanBlock:
 	addi $a0, $a0, ROW_LEN
@@ -591,12 +479,12 @@ drawCyanBlock:
 	sw $t8, 24($a0)
 	sw $t8, 28($a0)
 	sw $t8, 32($a0)
-	jal return
+	jr $ra
 
 drawSpike:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 0($a0)
 	sw $t8, 8($a0)
 	sw $t8, 16($a0)
@@ -618,12 +506,12 @@ drawSpike:
 	sw $t8, 0($a0)
 	sw $t8, 8($a0)
 	sw $t8, 16($a0)
-	jal return
+	jr $ra
 
 drawSpring:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 0($a0)
 	sw $t8, 4($a0)
 	sw $t8, 8($a0)
@@ -637,12 +525,12 @@ drawSpring:
 	sw $t8, 4($a0)
 	sw $t8, 8($a0)
 	sw $t8, 12($a0)
-	jal return
+	jr $ra
 
 drawJetpack:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	li $t9, YELLOW
 	sw $t9, 4($a0)
 	sw $t9, 16($a0)
@@ -667,12 +555,12 @@ drawJetpack:
 	addi $a0, $a0, ROW_LEN
 	sw $t8, 4($a0)
 	sw $t8, 16($a0)
-	jal return
-
+	jr $ra
+	
 drawHole:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 8($a0)
 	sw $t8, 12($a0)
 	sw $t8, 16($a0)
@@ -717,6 +605,7 @@ drawHole:
 	sw $t8, 12($a0)
 	sw $t8, 16($a0)
 	addi $a0, $a0, ROW_LEN
+	jr $ra
 	
 
 
@@ -724,7 +613,7 @@ drawSadPoodle:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
 	li $t0, PINK
-	li $t1, WHITE
+	li $t1, BLACK
 	li, $t2, GREY
 	li, $t3, CYAN
 	sw $t1, 20($a0)
@@ -876,13 +765,13 @@ drawSadPoodle:
 	sw $t1, 40($a0)
 	sw $t1, 44($a0)
 	sw $t1, 48($a0)
-	jal return
+	jr $ra
 
 drawPoodle:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
 	li $t0, PINK
-	li $t1, WHITE
+	li $t1, BLACK
 	li, $t2, GREY
 	sw $t1, 16($a0)
 	sw $t1, 20($a0)
@@ -955,8 +844,4 @@ drawPoodle:
 	sw $t1, 20($a0)
 	sw $t1, 24($a0)
 	sw $t1, 28($a0)
-	jal return
-
-
-
-	
+	jr $ra

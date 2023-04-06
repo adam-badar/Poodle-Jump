@@ -2,10 +2,11 @@
 #DEFINE CONSTANTS
 # width = 64, height = 128
 .eqv 	BASE_ADDRESS 	0x10008000	#top-left pixel
-.eqv	START_POSITION	0x1000F880	#starting position for poodle (64*120+32)*4
+.eqv	START_POSITION	0x1000F000	#starting position for poodle (64*120+32)*4
 .eqv	TOP_RIGHT	0x100080FC	#top-right pixel
 .eqv	END		0x1000FFFC
 .eqv	ROW_LEN		256
+.eqv	GAME_OVER	0x10009828
 #DEFINE COLOURS
 .eqv	WHITE		0xffffff
 .eqv	RED		0xff0000
@@ -34,24 +35,24 @@ main:
 	jal drawBackground
 	
 	#INITIALIZE
+		#variables:
+			#$s0: prev position
+			#$s1: curr position
+			#s2: 
 		li $s1, START_POSITION
 		li $s0, END
-		li $s6, 32
+		li $s6, 50
 	
 	
 	loop:
 		li $a0, 0xffff0000
 		lw $t9, 0($a0)
-		bne $t9, 1, sleep
+		bne $t9, 1, draw
 		jal keypress
 		move_check:
 			beq $s0, $s1, draw
 		clear:
 			move $a0, $s0
-			addi $a0, $a0, -ROW_LEN
-			addi $a0, $a0, -ROW_LEN
-			addi $a0, $a0, -ROW_LEN
-			move $a1, $s0
 			jal clearPoodle
 		draw:
 			move $a0, $s1
@@ -86,9 +87,11 @@ end:
 keypress:
 	
 	li	$t1, ROW_LEN
-	li	$t2, 252
-	addi	$t2, $t2, 252
+	li	$t2, ROW_LEN
+	addi	$t2, $t2, BASE_ADDRESS
 	li	$t3, END
+	addi	$t3, $t3, -2048 #checks if character on the last lien
+	
 	
 	lw	$t0, 4($a0)
 	beq	$t0, 0x61, key_a						# ASCII code of 'a' is 0x61 or 97 in decimal
@@ -127,7 +130,7 @@ keypress:
 	# go down
 	key_s:
 		# make sure ship is not in bottom row
-		bgt	$s1, $t3, keypress_done					# if $s1 is in the bottom row, don't go down
+		bgt	$s1, $t3, gameOver				# if $s1 is in the bottom row, don't go down
 		addi	$s1, $s1, ROW_LEN					# else, move down
 		addi	$s1, $s1, ROW_LEN					# else, move down
 		b keypress_done
@@ -142,11 +145,28 @@ keypress:
 # ------------------------------------
 	
 
+gameOver:
+	li $a0, GAME_OVER
+	jal drawG
+	addi $a0, $a0, 28
+	jal drawA
+	addi $a0, $a0, 28
+	jal drawM
+	addi $a0, $a0, 28
+	jal drawE
+	addi $a0, $a0, 28
+	jal drawO
+	addi $a0, $a0, 28
+	jal drawV
+	addi $a0, $a0, 28
+	jal drawE
+	addi $a0, $a0, 28
+	jal drawR
 #SET BACKGROUND..........................
 
 drawBackground:
 	li $t4, BACKGROUND
-	bgt $a0, $a1, return
+	bgt $a0, 0x1000FFFC, return
 	sw $t4, 0($a0)
 	addi $a0, $a0, 4
 	j drawBackground
@@ -157,7 +177,7 @@ drawBackground:
 drawG:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 4($a0)
 	sw $t8, 8($a0)
 	sw $t8, 12($a0)
@@ -189,7 +209,7 @@ drawG:
 drawA: 
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 4($a0)
 	sw $t8, 8($a0)
 	sw $t8, 12($a0)
@@ -221,7 +241,7 @@ drawA:
 drawM: 
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 0($a0)
 	sw $t8, 20($a0)
 	addi $a0, $a0, ROW_LEN
@@ -251,7 +271,7 @@ drawM:
 drawE:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 0($a0)
 	sw $t8, 4($a0)
 	sw $t8, 8($a0)
@@ -284,7 +304,7 @@ drawE:
 drawO: 
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 4($a0)
 	sw $t8, 8($a0)
 	sw $t8, 12($a0)
@@ -318,7 +338,7 @@ drawO:
 drawV:
 	addi $a0, $a0, ROW_LEN
 	addi $a0, $a0, ROW_LEN
-	li $t8, WHITE
+	li $t8, BLACK
 	sw $t8, 0($a0)
 	sw $t8, 20($a0)
 	addi $a0, $a0, ROW_LEN

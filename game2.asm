@@ -22,55 +22,48 @@
 .eqv	BLACK		0x000000
 .eqv	BACKGROUND	0Xffffe0
 
+.data
+backgroundColor: .word 0Xffffe0
+
 .text
 .globl main
 
 main:
 	li $a0, BASE_ADDRESS
-	li $a1, END
-	li $t0, CYAN
-	li $s6, 1000
-	sw $t0, 0($a0)
+	li $a1, START_POSITION
 	jal drawBackground
-	li $a0, BASE_ADDRESS
-	jal drawPoodle
-	#movement:
+	
+	#INITIALIZE
+		li $s1, START_POSITION
+		li $s0, END
+		li $s6, 32
+	
+	
 	loop:
-	li	$a0, 0xffff0000
-	lw	$t9, 0($a0)
-	bne	$t9, 1, main_update
-	jal	keypress
-	main_update:
-	move $a0, $s1
-	jal drawPoodle
-	move $s0, $s1
-	move $a0, $a1
-	main_sleep:
-			# Wait one second (20 milliseconds)
-			# decremennt if 
-			li	$v0, 32
-			move	$a0, $s6
+		li $a0, 0xffff0000
+		lw $t9, 0($a0)
+		bne $t9, 1, sleep
+		jal keypress
+		move_check:
+			beq $s0, $s1, draw
+		clear:
+			move $a0, $s0
+			addi $a0, $a0, -ROW_LEN
+			addi $a0, $a0, -ROW_LEN
+			addi $a0, $a0, -ROW_LEN
+			move $a1, $s0
+			jal clearPoodle
+		draw:
+			move $a0, $s1
+			jal drawPoodle
+			move $s0, $s1
+			
+		sleep:
+			li $v0, 32
+			move $a0, $s6
 			syscall
-		# ------------------------------------
-
+		
 		j loop
-	
-	
-	# TEMPORARY VARS
-		# $s0: previous character location
-		# $s1: current character location
-		# $s2: platform shift increment
-		# $s3: 1 if collision happened, 0 if not
-		# $s4: clock (number of frames played)
-		# $s5: 
-		# $s6: wait time (decreases as time goes on)
-		# $s7: wait clock
-
-	# main variables
-		# $t9: temp
-	#................................#
-	li $v0, 10
-	syscall
 	
 return:
 	jr $ra
@@ -91,6 +84,7 @@ end:
 		# $t
 		# $t9: temp
 keypress:
+	
 	li	$t1, ROW_LEN
 	li	$t2, 252
 	addi	$t2, $t2, 252
@@ -109,7 +103,7 @@ keypress:
 		div	$s1, $t1						# see if ship position is divisible by the width
 		mfhi	$t9							# $t9 = $s1 mod $t1 
 		beq	$t9, $zero, keypress_done				# if it is in the left column, we can't go left
-		addi	$s1, $s1, -4					# else, move left
+		addi	$s1, $s1, -4						# else, move left
 		b keypress_done
 
 	# go up
@@ -767,10 +761,86 @@ drawSadPoodle:
 	sw $t1, 48($a0)
 	jr $ra
 
+clearPoodle:
+	li $t0, BACKGROUND
+	li $t1, BACKGROUND
+	li, $t2, BACKGROUND
+	sw $t1, 16($a0)
+	sw $t1, 20($a0)
+	sw $t1, 24($a0)
+	addi $a0, $a0, ROW_LEN
+	sw $t1, 12($a0)
+	sw $t0, 16($a0)
+	sw $t0, 20($a0)
+	sw $t0, 24($a0)
+	sw $t1, 28($a0)
+	addi $a0, $a0, ROW_LEN 
+	sw $t1, 4($a0)
+	sw $t1, 8($a0)
+	sw $t0, 12($a0)
+	sw $t0, 16($a0)
+	sw $t0, 20($a0)
+	sw $t0, 24($a0)
+	sw $t0, 28($a0)
+	sw $t1, 32($a0)
+	sw $t1, 36($a0)
+	addi $a0, $a0, ROW_LEN
+	sw $t1, 0($a0)
+	sw $t2, 4($a0)
+	sw $t1, 8($a0)
+	sw $t0, 12($a0)
+	sw $t1, 16($a0)
+	sw $t0, 20($a0)
+	sw $t1, 24($a0)
+	sw $t0, 28($a0)
+	sw $t1, 32($a0)
+	sw $t2, 36($a0)
+	sw $t1, 40($a0)
+	addi $a0, $a0, ROW_LEN
+	sw $t1, 0($a0)
+	sw $t2, 4($a0)
+	sw $t1, 8($a0)
+	sw $t0, 12($a0)
+	sw $t0, 16($a0)
+	sw $t0, 20($a0)
+	sw $t0, 24($a0)
+	sw $t0, 28($a0)
+	sw $t1, 32($a0)
+	sw $t2, 36($a0)
+	sw $t1, 40($a0)
+	addi $a0, $a0, ROW_LEN
+	sw $t1, 0($a0)
+	sw $t2, 4($a0)
+	sw $t1, 8($a0)
+	sw $t0, 12($a0)
+	sw $t0, 16($a0)
+	sw $t0, 20($a0)
+	sw $t0, 24($a0)
+	sw $t0, 28($a0)
+	sw $t1, 32($a0)
+	sw $t2, 36($a0)
+	sw $t1, 40($a0)
+	addi $a0, $a0, ROW_LEN
+	sw $t1, 4($a0)
+	sw $t1, 8($a0)
+	sw $t0, 12($a0)
+	sw $t0, 16($a0)
+	sw $t0, 20($a0)
+	sw $t0, 24($a0)
+	sw $t0, 28($a0)
+	sw $t1, 32($a0)
+	sw $t1, 36($a0)
+	addi $a0, $a0, ROW_LEN
+	sw $t1, 12($a0)
+	sw $t1, 16($a0)
+	sw $t1, 20($a0)
+	sw $t1, 24($a0)
+	sw $t1, 28($a0)
+	jr $ra
+
+
 drawPoodle:
-	addi $a0, $a0, ROW_LEN
-	addi $a0, $a0, ROW_LEN
-	li $t0, PINK
+	li $t0, RED
 	li $t1, BLACK
 	li, $t2, GREY
 	sw $t1, 16($a0)

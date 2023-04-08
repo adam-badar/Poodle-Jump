@@ -7,7 +7,8 @@
 .eqv	END		0x1000FFFC
 .eqv	ROW_LEN		256
 .eqv	GAME_OVER	0x10009828
-.eqv	START_PLAT	0x1000F878
+.eqv	START_PLAT	0x1000D078
+.eqv	NORMAL_JUMP	8192
 #DEFINE COLOURS
 .eqv	WHITE		0xffffff
 .eqv	RED		0xff0000
@@ -26,9 +27,19 @@
 
 .data
 backgroundColor: .word 0Xffffe0
-
+gameMatrix: .word 0:1536
+platform1: .word 12
 .text
 .globl main
+
+#USAGE OF TEMPS:
+	#$t0, $t1, $t2, $t3: colour
+	#$t4: background
+	#$t5: pixels under player
+	#$t6: used to check collision
+	#$t7: counter for jumps
+
+
 
 main:
 	li $a0, BASE_ADDRESS
@@ -53,12 +64,11 @@ main:
 		li $s6, 50
 		li $s7, 0
 		li $t5, START_POSITION
-		addi $t5, $t5, 340
+		addi $t5, $t5, 1804
 		
 	
 	loop:	
-		#bne $s2, 0, goUp
-		jal goDown			
+		jal movement
 		li $a0, 0xffff0000
 		lw $t9, 0($a0)
 		bne $t9, 1, clear		#if key is not pressed then move on
@@ -67,13 +77,12 @@ main:
 		clear:
 			move $a0, $s0		#set a0 to prev location
 			jal clearPoodle		#clear prev location
-			
 		draw:
 			move $t5, $s1		#set t5 to start of player location
-			addi $t5, $t5, 340	#set t5 to start of bottom of player location
-			jal checkCollision
+			addi $t5, $t5, 1804	#set t5 to start of bottom of player location
+			#jal checkCollision
 			move $a0, $s1		#set a0 to new location
-			jal drawPoodle		#draw at new location
+			jal drawSadPoodle		#draw at new location
 			move $a0, $s3		#set a0 to platform location
 			jal drawRedBlock	#draw platform
 			move $s0, $s1		#set s0 to current location
@@ -85,26 +94,68 @@ main:
 		
 		j loop
 	
-return:
-	jr $ra
+
 #FINISH PEACEFULLLY
 end:
 	li $v0, 10
 	syscall
 	
 #.......................................
+
+movement:
+	beq $s2, 1, goUp
+	beq $s2, 0, goDown
+		
 goDown:
 	li	$t3, END
-	addi	$t3, $t3, -2048 #checks if character on the last line
-
+	addi	$t3, $t3, -2048 	#checks if character on the last line
+	li	$t4, BACKGROUND		#stores the background colour
+	addi	$t5, $t5, ROW_LEN	#sets t5 to the pixel underneath the player
+	lw	$t6, 0($t5)		#sets t6 to the colour of t5
+	bne	$t6, $t4, setUp		#checks if the pixel under does not equal background
+	lw	$t6, 4($t5)
+	bne	$t6, $t4, setUp
+	lw	$t6, 8($t5)
+	bne	$t6, $t4, setUp
+	lw	$t6, 12($t5)
+	bne	$t6, $t4, setUp
+	lw	$t6, 16($t5)
+	bne	$t6, $t4, setUp
 	# go down
 	key_s:
-		
 		# make sure ship is not in bottom row
-		bgt	$s1, $t3, keypress_done				# if $s1 is in the bottom row, don't go down
+		bgt	$s1, $t3, return			# if $s1 is in the bottom row, don't go down
 		addi	$s1, $s1, ROW_LEN					# else, move down
 		addi	$s1, $s1, ROW_LEN					# else, move down
-		b keypress_done
+		b return
+#.......................................
+goUp:	
+	beq	$t7, 5, stopUp
+	li	$t2, ROW_LEN
+	addi	$t2, $t2, BASE_ADDRESS
+	addi	$t7, $t7, 1
+
+	key_w:
+		# make sure ship is not in top row
+		blt	$s1, $t2, return				# if $s1 is in the top row, don't go up
+		addi	$s1, $s1, -ROW_LEN				# else, move up
+		addi	$s1, $s1, -ROW_LEN				# else, move up
+		b return
+	stopUp:
+		li $s2, 0
+		jr $ra
+#.......................................
+
+setUp:
+	beq $s7, 0, normalJump #if there is not powerup, jump normally
+	
+	normalJump:
+		li $t7, 0	
+		li $s2, 1	#set the jump to up
+		li $s7, 1	#set the jump type to normal
+		jr $ra
+
+
 
 # ------------------------------------
 # handling different keypresses
@@ -125,7 +176,7 @@ keypress:
 	
 	lw	$t0, 4($a0)
 	beq	$t0, 0x61, key_a						# ASCII code of 'a' is 0x61 or 97 in decimal
-	beq	$t0, 0x77, key_w						# ASCII code of 'w' is 0x77
+	#beq	$t0, 0x77, key_w						# ASCII code of 'w' is 0x77
 	beq	$t0, 0x64, key_d						# ASCII code of 'd' is 0x64
 	#beq	$t0, 0x73, key_s						# ASCII code of 's' is 0x73
 	beq	$t0, 0x70, key_p						# ASCII code of 'p' is 0x70
@@ -135,17 +186,9 @@ keypress:
 		# make sure ship is not in left column
 		div	$s1, $t1						# see if ship position is divisible by the width
 		mfhi	$t9							# $t9 = $s1 mod $t1 
-		beq	$t9, $zero, keypress_done				# if it is in the left column, we can't go left
+		beq	$t9, $zero, return				# if it is in the left column, we can't go left
 		addi	$s1, $s1, -4						# else, move left
-		b keypress_done
-
-	# go up
-	key_w:
-		# make sure ship is not in top row
-		blt	$s1, $t2, keypress_done					# if $s1 is in the top row, don't go up
-		addi	$s1, $s1, -ROW_LEN				# else, move up
-		addi	$s1, $s1, -ROW_LEN				# else, move up
-		b keypress_done
+		b return
 
 	# go right
 	key_d:
@@ -153,17 +196,17 @@ keypress:
 		div	$s1, $t1						# see if ship position is divisible by the width
 		mfhi	$t9							# $t9 = $s1 mod $t1 
 		addi	$t1, $t1, -48						# need to check if the mod is the row size - 12*4 (width of plane-1)
-		beq	$t9, $t1, keypress_done					# if it is in the far right column, we can't go right
+		beq	$t9, $t1, return					# if it is in the far right column, we can't go right
 		addi	$s1, $s1, 4						# else, move right
-		b keypress_done
+		b return
 
 
 	key_p:
 		# restart game
 		la	$ra, main
-		b keypress_done
+		b return
 
-	keypress_done:
+	return:
 		jr	$ra							# jump to ra
 # ------------------------------------
 	
@@ -652,8 +695,7 @@ drawSadPoodle:
 	addi $a0, $a0, ROW_LEN
 	li $t0, PINK
 	li $t1, BLACK
-	li, $t2, GREY
-	li, $t3, CYAN
+	li, $t2, CYAN
 	sw $t1, 20($a0)
 	sw $t1, 24($a0)
 	sw $t1, 28($a0)
@@ -712,11 +754,11 @@ drawSadPoodle:
 	sw $t1, 12($a0)
 	sw $t0, 16($a0)
 	sw $t0, 20($a0)
-	sw $t3, 24($a0)
+	sw $t2, 24($a0)
 	sw $t0, 28($a0)
 	sw $t0, 32($a0)
 	sw $t0, 36($a0)
-	sw $t3, 40($a0)
+	sw $t2, 40($a0)
 	sw $t0, 44($a0)
 	sw $t0, 48($a0)
 	sw $t1, 52($a0)
@@ -730,11 +772,11 @@ drawSadPoodle:
 	sw $t1, 12($a0)
 	sw $t0, 16($a0)
 	sw $t0, 20($a0)
-	sw $t3, 24($a0)
+	sw $t2, 24($a0)
 	sw $t0, 28($a0)
 	sw $t0, 32($a0)
 	sw $t0, 36($a0)
-	sw $t3, 40($a0)
+	sw $t2, 40($a0)
 	sw $t0, 44($a0)
 	sw $t0, 48($a0)
 	sw $t1, 52($a0)

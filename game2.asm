@@ -2,11 +2,12 @@
 #DEFINE CONSTANTS
 # width = 64, height = 128
 .eqv 	BASE_ADDRESS 	0x10008000	#top-left pixel
-.eqv	START_POSITION	0x1000F000	#starting position for poodle (64*120+32)*4
+.eqv	START_POSITION	0x1000BC70	#starting position for poodle (64*120+32)*4
 .eqv	TOP_RIGHT	0x100080FC	#top-right pixel
 .eqv	END		0x1000FFFC
 .eqv	ROW_LEN		256
 .eqv	GAME_OVER	0x10009828
+.eqv	START_PLAT	0x1000F878
 #DEFINE COLOURS
 .eqv	WHITE		0xffffff
 .eqv	RED		0xff0000
@@ -38,27 +39,45 @@ main:
 		#variables:
 			#$s0: prev position
 			#$s1: curr position
-			#s2: 
-		li $s1, START_POSITION
+			#s2:  player direction
+			#s3:  platform location 1
+			#s4: platform location 2
+			#s5: platform location 3
+			#s6: Refresh rate
+			#s7: current powerup (0: none ie moving down, 1: normal jump, 2: spring, 3: jetpack)
+			#t5: pixels under player
 		li $s0, END
+		li $s1, START_POSITION
+		li $s2, 0 #0 indicates down, 1 indicates up
+		li $s3, START_PLAT
 		li $s6, 50
+		li $s7, 0
+		li $t5, START_POSITION
+		addi $t5, $t5, 340
+		
 	
-	
-	loop:
+	loop:	
+		#bne $s2, 0, goUp
+		jal goDown			
 		li $a0, 0xffff0000
 		lw $t9, 0($a0)
-		bne $t9, 1, draw
+		bne $t9, 1, clear		#if key is not pressed then move on
 		jal keypress
-		move_check:
-			beq $s0, $s1, draw
+
 		clear:
-			move $a0, $s0
-			jal clearPoodle
-		draw:
-			move $a0, $s1
-			jal drawPoodle
-			move $s0, $s1
+			move $a0, $s0		#set a0 to prev location
+			jal clearPoodle		#clear prev location
 			
+		draw:
+			move $t5, $s1		#set t5 to start of player location
+			addi $t5, $t5, 340	#set t5 to start of bottom of player location
+			jal checkCollision
+			move $a0, $s1		#set a0 to new location
+			jal drawPoodle		#draw at new location
+			move $a0, $s3		#set a0 to platform location
+			jal drawRedBlock	#draw platform
+			move $s0, $s1		#set s0 to current location
+				
 		sleep:
 			li $v0, 32
 			move $a0, $s6
@@ -74,6 +93,18 @@ end:
 	syscall
 	
 #.......................................
+goDown:
+	li	$t3, END
+	addi	$t3, $t3, -2048 #checks if character on the last line
+
+	# go down
+	key_s:
+		
+		# make sure ship is not in bottom row
+		bgt	$s1, $t3, keypress_done				# if $s1 is in the bottom row, don't go down
+		addi	$s1, $s1, ROW_LEN					# else, move down
+		addi	$s1, $s1, ROW_LEN					# else, move down
+		b keypress_done
 
 # ------------------------------------
 # handling different keypresses
@@ -89,17 +120,16 @@ keypress:
 	li	$t1, ROW_LEN
 	li	$t2, ROW_LEN
 	addi	$t2, $t2, BASE_ADDRESS
-	li	$t3, END
-	addi	$t3, $t3, -2048 #checks if character on the last lien
+
 	
 	
 	lw	$t0, 4($a0)
 	beq	$t0, 0x61, key_a						# ASCII code of 'a' is 0x61 or 97 in decimal
 	beq	$t0, 0x77, key_w						# ASCII code of 'w' is 0x77
 	beq	$t0, 0x64, key_d						# ASCII code of 'd' is 0x64
-	beq	$t0, 0x73, key_s						# ASCII code of 's' is 0x73
+	#beq	$t0, 0x73, key_s						# ASCII code of 's' is 0x73
 	beq	$t0, 0x70, key_p						# ASCII code of 'p' is 0x70
-
+	jr $ra
 	# go left
 	key_a:
 		# make sure ship is not in left column
@@ -127,13 +157,6 @@ keypress:
 		addi	$s1, $s1, 4						# else, move right
 		b keypress_done
 
-	# go down
-	key_s:
-		# make sure ship is not in bottom row
-		bgt	$s1, $t3, gameOver				# if $s1 is in the bottom row, don't go down
-		addi	$s1, $s1, ROW_LEN					# else, move down
-		addi	$s1, $s1, ROW_LEN					# else, move down
-		b keypress_done
 
 	key_p:
 		# restart game
@@ -162,6 +185,7 @@ gameOver:
 	jal drawE
 	addi $a0, $a0, 28
 	jal drawR
+	jal keypress
 #SET BACKGROUND..........................
 
 drawBackground:
